@@ -1,0 +1,37 @@
+version: "3.8"
+services:
+  central:
+    build:
+      context: ./central-api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+
+  storage1:
+    build:
+      context: ./storage-9001
+      dockerfile: Dockerfile
+    ports:
+      - "9001:9001"
+    environment:
+      - PORT=9001
+
+  storage2:
+    build:
+      context: ./storage-9002
+      dockerfile: Dockerfile
+    ports:
+      - "9002:9002"
+    environment:
+      - PORT=9002
+
+  storage3:
+    build:
+      context: ./storage-9003
+      dockerfile: Dockerfile
+    ports:
+      - "9003:9003"
+    environment:
+      - PORT=9003

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Central Files</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: middle; }
+        th { background: #f4f4f4; }
+        img { max-width: 100px; max-height: 80px; }
+        .missing { color: red; font-weight: bold; }
+        .button { padding: 8px 16px; margin-top: 20px; background: #007BFF; color: white; border: none; cursor: pointer; border-radius: 4px; }
+        .button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+
+<h2>Central Server Files</h2>
+<td><p><strong>Nearest Server:</strong> {{.NearestServer}}</p></td>
+<table>
+    <tr>
+        <th>Filename</th>
+        <th>Central</th>
+        <th>Server 9001</th>
+        <th>Server 9002</th>
+        <th>Server 9003</th>
+        
+        <th>Action</th>
+        
+    </tr>
+
+    {{range .Files}}
+        <tr>
+            <td>{{.Name}}</td>
+            <td><img src="/files/{{.Name}}" alt="{{.Name}}"></td>
+            <td>{{if index .Replica "9001"}}<img src="http://localhost:9001/files/{{.Name}}">{{else}}<span class="missing">Missing</span>{{end}}</td>
+            <td>{{if index .Replica "9002"}}<img src="http://localhost:9002/files/{{.Name}}">{{else}}<span class="missing">Missing</span>{{end}}</td>
+            <td>{{if index .Replica "9003"}}<img src="http://localhost:9003/files/{{.Name}}">{{else}}<span class="missing">Missing</span>{{end}}</td>
+            
+            <td>
+                <a href="/delete?filename={{.Name}}" onclick="return confirm('Are you sure?')">Delete</a>
+                |
+                <a href="/nearest-view?filename={{.Name}}">Get Nearest</a>
+            </td>
+        </tr>
+        {{end}}
+</table>
+
+<!-- Return/Home button -->
+<button class="button" onclick="window.location='/'">Return</button>
+
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Storage Dashboard</title>
+</head>
+<body>
+<h1>Storage Servers</h1>
+{{ range . }}
+  <h2>{{ .URL }}</h2>
+  {{ if .Files }}
+    <ul>
+      {{ range .Files }}
+        <li>{{ . }} - 
+        <a href="/delete?filename={{ . }}">Delete</a></li>
+      {{ end }}
+    </ul>
+  {{ else }}
+    <p>No files</p>
+  {{ end }}
+{{ end }}
+<hr>
+<a href="/">Back to Upload</a>
+</body>
+</html>
