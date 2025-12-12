@@ -33,9 +33,9 @@ type StorageServer struct {
 }
 
 var storages = []StorageServer{
-	{URL: "http://localhost:9001", Lat: 1.3521, Lon: 103.8198},  // Singapore
-	{URL: "http://localhost:9002", Lat: 40.7128, Lon: -74.0060}, // New York
-	{URL: "http://localhost:9003", Lat: 51.5074, Lon: -0.1278},  // London
+	{URL: "http://146.190.91.216:9001", Lat: 1.3521, Lon: 103.8198},
+	{URL: "http://45.55.63.160:9002", Lat: 40.7128, Lon: -74.0060},
+	{URL: "http://188.166.168.103:9003", Lat: 51.5074, Lon: -0.1278},
 }
 
 // ---------------------------
