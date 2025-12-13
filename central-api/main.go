@@ -33,9 +33,9 @@ type StorageServer struct {
 }
 
 var storages = []StorageServer{
-	{URL: "http://146.190.91.216:9001", Lat: 1.3521, Lon: 103.8198},
-	{URL: "http://45.55.63.160:9002", Lat: 40.7128, Lon: -74.0060},
-	{URL: "http://188.166.168.103:9003", Lat: 51.5074, Lon: -0.1278},
+	{URL: "http://68.183.231.211", Lat: 1.3521, Lon: 103.8198},  // Singapore
+	{URL: "http://167.71.177.212", Lat: 40.7128, Lon: -74.0060}, // New York
+	{URL: "http://159.65.48.116", Lat: 51.5074, Lon: -0.1278},   // London
 }
 
 // ---------------------------
@@ -80,7 +80,6 @@ func haversineKm(lat1, lon1, lat2, lon2 float64) float64 {
 	return R * c
 }
 
-// Get client IP
 func getClientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		parts := strings.Split(xff, ",")
@@ -96,18 +95,17 @@ func getClientIP(r *http.Request) string {
 	return host
 }
 
-// Approximate IP location (for local testing)
+// Approximate location for testing
 func approximateLocation(ip string) (float64, float64) {
 	if strings.HasPrefix(ip, "127.") {
-		return 1.3521, 103.8198 // Singapore
+		return 1.3521, 103.8198 // SG
 	}
 	if strings.HasPrefix(ip, "192.168.1.") {
-		return 40.7128, -74.0060 // New York
+		return 40.7128, -74.0060 // NY
 	}
 	return 51.5074, -0.1278 // London
 }
 
-// Get nearest storage based on lat/lon
 func getNearestStorage(lat, lon float64) string {
 	nearest := ""
 	minDist := 999999.0
@@ -123,7 +121,7 @@ func getNearestStorage(lat, lon float64) string {
 }
 
 // ---------------------------
-// Nearest File Handler
+// Handlers
 // ---------------------------
 func nearestViewHandler(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("filename")
@@ -132,7 +130,6 @@ func nearestViewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine client location
 	clientIP := getClientIP(r)
 	lat, lon := approximateLocation(clientIP)
 
@@ -143,38 +140,37 @@ func nearestViewHandler(w http.ResponseWriter, r *http.Request) {
 		IsNearest bool
 	}
 
-	distances := []DistanceInfo{}
-	nearestURL := ""
-	minDist := 999999.0
+	var distances []DistanceInfo
+	minDist := math.MaxFloat64
+	var nearest StorageServer
 
-	// Calculate distances
 	for _, s := range storages {
 		d := haversineKm(lat, lon, s.Lat, s.Lon)
-		distInfo := DistanceInfo{
+		u, _ := url.Parse(s.URL)
+
+		info := DistanceInfo{
 			URL:      s.URL,
-			Port:     strings.TrimPrefix(s.URL, "http://localhost:"),
+			Port:     u.Port(),
 			Distance: d,
 		}
 
 		if d < minDist {
 			minDist = d
-			nearestURL = s.URL
+			nearest = s
 		}
 
-		distances = append(distances, distInfo)
+		distances = append(distances, info)
 	}
 
-	// Mark nearest
 	for i := range distances {
-		if distances[i].URL == nearestURL {
+		if distances[i].URL == nearest.URL {
 			distances[i].IsNearest = true
 		}
 	}
 
-	previewURL := nearestURL + "/files/" + filename
-	nearestPort := strings.TrimPrefix(nearestURL, "http://localhost:")
+	previewURL := nearest.URL + "/files/" + filename
+	u, _ := url.Parse(nearest.URL)
 
-	// Pass to template
 	data := struct {
 		Filename    string
 		PreviewURL  string
@@ -183,16 +179,15 @@ func nearestViewHandler(w http.ResponseWriter, r *http.Request) {
 	}{
 		Filename:    filename,
 		PreviewURL:  previewURL,
-		NearestPort: nearestPort,
+		NearestPort: u.Port(),
 		Distances:   distances,
 	}
 
-	templates.ExecuteTemplate(w, "nearest.html", data)
+	if err := templates.ExecuteTemplate(w, "nearest.html", data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
-// ---------------------------
-// Upload Handler
-// ---------------------------
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Use POST", http.StatusMethodNotAllowed)
@@ -219,7 +214,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	filename := filepath.Base(header.Filename)
 
-	// Save locally
 	os.MkdirAll("uploads", 0755)
 	dstPath := filepath.Join("uploads", filename)
 	dst, err := os.Create(dstPath)
@@ -230,7 +224,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	defer dst.Close()
 	_, _ = dst.Write(fileBytes)
 
-	// Replicate to storage servers
+	// Replicate
 	for _, s := range storages {
 		status, body, err := forwardFileTo(s.URL, filename, fileBytes)
 		if err != nil {
@@ -243,9 +237,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/files", http.StatusSeeOther)
 }
 
-// ---------------------------
-// Delete Handler
-// ---------------------------
 func deleteHandler(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("filename")
 	if filename == "" {
@@ -253,33 +244,16 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Delete local
-	localPath := filepath.Join("uploads", filename)
-	err := os.Remove(localPath)
-	if err != nil {
-		fmt.Println("Local delete error:", err)
-	}
+	os.Remove(filepath.Join("uploads", filename))
 
-	// Delete on storage servers
 	encodedName := url.QueryEscape(filename)
 	for _, s := range storages {
-		urlToCall := s.URL + "/delete?filename=" + encodedName
-		resp, err := http.Get(urlToCall)
-		if err != nil {
-			fmt.Println("Delete error on", s.URL, ":", err)
-			continue
-		}
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		fmt.Println("Deleted on", s.URL, "Status:", resp.StatusCode, "Body:", string(body))
+		http.Get(s.URL + "/delete?filename=" + encodedName)
 	}
 
 	http.Redirect(w, r, "/files", http.StatusSeeOther)
 }
 
-// ---------------------------
-// List Files Handler
-// ---------------------------
 func listFilesHandler(w http.ResponseWriter, r *http.Request) {
 	files, _ := ioutil.ReadDir("uploads")
 
@@ -307,41 +281,28 @@ func listFilesHandler(w http.ResponseWriter, r *http.Request) {
 			"9002": false,
 			"9003": false,
 		}
-		for _, s := range storages {
+		for i, s := range storages {
 			for _, r := range allStorage[s.URL] {
 				if r == f.Name() {
-					if s.URL == "http://localhost:9001" {
-						replica["9001"] = true
-					}
-					if s.URL == "http://localhost:9002" {
-						replica["9002"] = true
-					}
-					if s.URL == "http://localhost:9003" {
-						replica["9003"] = true
-					}
+					replica[fmt.Sprintf("900%d", i+1)] = true
 				}
 			}
 		}
 		out = append(out, FileInfo{Name: f.Name(), Replica: replica})
 	}
 
-	// ------------------------------
-	// Determine nearest storage
-	// ------------------------------
 	clientIP := getClientIP(r)
 	lat, lon := approximateLocation(clientIP)
 	nearestURL := getNearestStorage(lat, lon)
+
 	nearestPort := ""
-	switch nearestURL {
-	case "http://localhost:9001":
-		nearestPort = "9001"
-	case "http://localhost:9002":
-		nearestPort = "9002"
-	case "http://localhost:9003":
-		nearestPort = "9003"
+	for i, s := range storages {
+		if s.URL == nearestURL {
+			nearestPort = fmt.Sprintf("900%d", i+1)
+			break
+		}
 	}
 
-	// Pass data to template
 	data := struct {
 		Files         []FileInfo
 		NearestServer string
