@@ -1,52 +1,131 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Central Files</title>
     <style>
-        body { font-family: Arial; margin: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: middle; }
-        th { background: #f4f4f4; }
-        img { max-width: 100px; max-height: 80px; }
-        .missing { color: red; font-weight: bold; }
-        .button { padding: 8px 16px; margin-top: 20px; background: #007BFF; color: white; border: none; cursor: pointer; border-radius: 4px; }
-        .button:hover { background: #0056b3; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        h2 {
+            margin-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        th {
+            background: #f4f4f4;
+        }
+
+        img {
+            max-width: 100px;
+            max-height: 80px;
+        }
+
+        .missing {
+            color: red;
+            font-weight: bold;
+        }
+
+        .actions a {
+            margin: 0 5px;
+            text-decoration: none;
+            color: #007BFF;
+        }
+
+        .actions a:hover {
+            text-decoration: underline;
+        }
+
+        .button {
+            margin-top: 20px;
+            padding: 8px 16px;
+            background: #007BFF;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .button:hover {
+            background: #0056b3;
+        }
     </style>
 </head>
 <body>
 
 <h2>Central Server Files</h2>
-<td><p><strong>Nearest Server:</strong> {{.NearestServer}}</p></td>
+
+<p><strong>Nearest Server:</strong> Storage {{.NearestServer}}</p>
+
 <table>
     <tr>
         <th>Filename</th>
         <th>Central</th>
-        <th>Server 9001</th>
-        <th>Server 9002</th>
-        <th>Server 9003</th>
-        
+        <th>Storage 9001 (Singapore)</th>
+        <th>Storage 9002 (New York)</th>
+        <th>Storage 9003 (London)</th>
         <th>Action</th>
-        
     </tr>
 
     {{range .Files}}
-        <tr>
-            <td>{{.Name}}</td>
-            <td><img src="/files/{{.Name}}" alt="{{.Name}}"></td>
-            <td>{{if index .Replica "9001"}}<img src="http://localhost:9001/files/{{.Name}}">{{else}}<span class="missing">Missing</span>{{end}}</td>
-            <td>{{if index .Replica "9002"}}<img src="http://localhost:9002/files/{{.Name}}">{{else}}<span class="missing">Missing</span>{{end}}</td>
-            <td>{{if index .Replica "9003"}}<img src="http://localhost:9003/files/{{.Name}}">{{else}}<span class="missing">Missing</span>{{end}}</td>
-            
-            <td>
-                <a href="/delete?filename={{.Name}}" onclick="return confirm('Are you sure?')">Delete</a>
-                |
-                <a href="/nearest-view?filename={{.Name}}">Get Nearest</a>
-            </td>
-        </tr>
-        {{end}}
+    <tr>
+        <td>{{.Name}}</td>
+
+        <!-- Central -->
+        <td>
+            <img src="/files/{{.Name}}" alt="{{.Name}}">
+        </td>
+
+        <!-- Storage 9001 -->
+        <td>
+            {{if index .Replica "9001"}}
+                <img src="http://68.183.231.211:9001/files/{{.Name}}" alt="{{.Name}}">
+            {{else}}
+                <span class="missing">Missing</span>
+            {{end}}
+        </td>
+
+        <!-- Storage 9002 -->
+        <td>
+            {{if index .Replica "9002"}}
+                <img src="http://167.71.177.212:9002/files/{{.Name}}" alt="{{.Name}}">
+            {{else}}
+                <span class="missing">Missing</span>
+            {{end}}
+        </td>
+
+        <!-- Storage 9003 -->
+        <td>
+            {{if index .Replica "9003"}}
+                <img src="http://159.65.48.116:9003/files/{{.Name}}" alt="{{.Name}}">
+            {{else}}
+                <span class="missing">Missing</span>
+            {{end}}
+        </td>
+
+        <!-- Actions -->
+        <td class="actions">
+            <a href="/nearest-view?filename={{.Name}}">Nearest</a> |
+            <a href="/delete?filename={{.Name}}" onclick="return confirm('Delete this file?')">Delete</a>
+        </td>
+    </tr>
+    {{end}}
 </table>
 
-<!-- Return/Home button -->
 <button class="button" onclick="window.location='/'">Return</button>
 
 </body>

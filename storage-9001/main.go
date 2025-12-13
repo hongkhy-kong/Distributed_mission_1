@@ -13,8 +13,39 @@ import (
 
 var storagePath = "files"
 
+func main() {
+	// Set port per instance
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "9001" // default port, override for each droplet
+	}
+
+	// Ensure storage directory exists
+	if err := os.MkdirAll(storagePath, 0755); err != nil {
+		log.Fatalf("Failed to create storage directory: %v", err)
+	}
+
+	// Routes
+	http.HandleFunc("/upload", uploadHandler)
+	http.HandleFunc("/delete", deleteHandler)
+	http.HandleFunc("/files", listFilesHandler)                                                 // JSON list
+	http.Handle("/files/", http.StripPrefix("/files/", http.FileServer(http.Dir(storagePath)))) // serve actual files
+
+	fmt.Printf("Storage server listening on port %s\n", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
+}
+
+// Upload a file to storage
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
-	os.MkdirAll(storagePath, os.ModePerm)
+	if r.Method != http.MethodPost {
+		http.Error(w, "Use POST", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseMultipartForm(100 << 20); err != nil {
+		http.Error(w, "Parse error: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
@@ -31,15 +62,16 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer dst.Close()
 
-	_, err = io.Copy(dst, file)
-	if err != nil {
+	if _, err := io.Copy(dst, file); err != nil {
 		http.Error(w, "Write error", http.StatusInternalServerError)
 		return
 	}
 
+	fmt.Printf("Uploaded: %s\n", dstPath)
 	w.Write([]byte("OK|" + header.Filename))
 }
 
+// Delete a file from storage
 func deleteHandler(w http.ResponseWriter, r *http.Request) {
 	raw := r.URL.Query().Get("filename")
 	if raw == "" {
@@ -54,8 +86,7 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fullPath := filepath.Join(storagePath, filename)
-	err = os.Remove(fullPath)
-	if err != nil {
+	if err := os.Remove(fullPath); err != nil {
 		fmt.Println("Delete failed:", fullPath, err)
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
@@ -65,26 +96,19 @@ func deleteHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Deleted " + filename))
 }
 
+// List all files as JSON
 func listFilesHandler(w http.ResponseWriter, r *http.Request) {
-	files, _ := os.ReadDir(storagePath)
+	files, err := os.ReadDir(storagePath)
+	if err != nil {
+		http.Error(w, "Cannot read directory", http.StatusInternalServerError)
+		return
+	}
+
 	var list []string
 	for _, f := range files {
 		list = append(list, f.Name())
 	}
+
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(list)
-}
-
-func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "9001" // override per instance
-	}
-
-	http.HandleFunc("/upload", uploadHandler)
-	http.HandleFunc("/delete", deleteHandler)
-	http.HandleFunc("/files", listFilesHandler)
-	http.Handle("/files/", http.StripPrefix("/files/", http.FileServer(http.Dir(storagePath))))
-
-	fmt.Printf("Storage server listening :%s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
